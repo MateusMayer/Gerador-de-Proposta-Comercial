@@ -1,0 +1,5 @@
+2024-03-11 18:27:56,151 - INFO - Abrindo diálogo para escolher o local de salvamento
+2024-03-11 18:28:05,940 - INFO - Caminho de salvamento escolhido: C:/Users/Mateus Mayer/Downloads/teste.docx
+2024-03-11 18:28:05,949 - INFO - Cópia realizada
+2024-03-11 18:28:05,968 - INFO - Documento de cópia aberto para edição com sucesso
+2024-03-11 18:28:05,975 - ERROR - Erro ao atribuir as referências dos novos módulos: No module named 'babel.numbers'
