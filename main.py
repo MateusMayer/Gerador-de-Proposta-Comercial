@@ -10,6 +10,7 @@ from babel.dates import format_date
 import logging
 import sys
 
+
 logging.basicConfig(filename='app.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Define o caminho base uma única vez
@@ -17,7 +18,7 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     base_path = sys._MEIPASS
 else:
     base_path = os.path.dirname(__file__)
-
+################################################# referenciascampos() ####################################################
 def referenciascampos():
     data_atual = date.today()
     data_formatada = format_date(data_atual, format='long', locale='pt_BR')
@@ -25,12 +26,12 @@ def referenciascampos():
     n001 = n001_entry.get()
     s001 = s001_entry.get()
     s003 = s003_entry.get()
-    s004 = s004_entry.get()
     s005 = s005_entry.get()
     c001 = c001_entry.get()
     h001 = h001_entry.get()
     d003 = d003_entry.get()
     v001 = v001_entry.get()
+    t001 = modo_trabalho_modulo_1.get()
 
     data_formatada_d002 = datetime.now().strftime("%d/%m/%Y")
     data_formatada_d001 = data_formatada
@@ -38,40 +39,39 @@ def referenciascampos():
     referencias = {
         "N001": n001, "S001": s001, "S003": s003, "D001": data_formatada_d001,
         "D002": data_formatada_d002,
-        "S004": s004, "S005": s005,
-        "C001": c001, "H001": h001, "D003": d003, "V001": v001,
+        "S005": s005,
+        "C001": c001, "H001": h001, "D003": d003, "V001": v001, "T001": t001
     }
     return referencias
-
+######################################## replace_text_in_runs(runs, code, value) #########################################
 def replace_text_in_runs(runs, code, value):
     for run in runs:
         run.text = run.text.replace(code, value)
 
-
+################################################### def novosmodulos(): ##################################################
 def novosmodulos():
-    # Inicializa o dicionário de referências com valores de campos estáticos
     referencias = referenciascampos()
 
-    # Itera sobre cada módulo dinâmico para processar seus valores
     for modulo_idx, module_widgets in enumerate(dynamic_modules_widgets, start=2):
-        modulo_valores = [widget.get() for widget in module_widgets if isinstance(widget, tk.Entry)]
+        # Modifica a coleta de valores para incluir o modo de trabalho
+        modulo_valores = [widget.get() for widget in module_widgets[:-1] if isinstance(widget, tk.Entry)]
+        modo_trabalho = module_widgets[-1].get()  # O último item é a variável StringVar do modo de trabalho
 
-        # Verifica se o módulo atual tem todos os 4 valores necessários
-        if len(modulo_valores) >= 4:
-            c, h, d, v = modulo_valores  # Desempacota os valores
+        if len(modulo_valores) == 4:  # Confirma que temos 4 valores de entrada
+            c, h, d, v = modulo_valores
 
-            # Atualiza o dicionário de referências com valores do módulo atual
             referencias[f'C{modulo_idx:03}'] = c
             referencias[f'H{modulo_idx:03}'] = h
-            referencias[f'D{modulo_idx+2:03}'] = d
+            referencias[f'D{modulo_idx + 2:03}'] = d
             referencias[f'V{modulo_idx:03}'] = v
+            referencias[f'T{modulo_idx:03}'] = modo_trabalho
         else:
-            # Se um módulo não tem todos os 4 valores, para o processamento
-            logging.error("Modulo não tem todos os 4 valores")
+            logging.error("Módulo não tem todos os 4 valores de entrada")
             break
-    print("Antes novos modulos:",referencias)
+
     return referencias
 
+####################### def replace_marker_with_image(documento, marcador, caminho_imagem, width): #######################
 def replace_marker_with_image(documento, marcador, caminho_imagem, width):
     for paragrafo in documento.paragraphs:
         if marcador in paragrafo.text:
@@ -82,31 +82,7 @@ def replace_marker_with_image(documento, marcador, caminho_imagem, width):
             # Note que isso adicionará a imagem após qualquer texto existente no parágrafo
             paragrafo.add_run().add_picture(caminho_imagem, width=width)
 
-def preencher_linha_tabela(tabela, linha_idx, referencias, config_colunas):
-    # Verifica se a tabela tem linhas suficientes
-    if len(tabela.rows) <= linha_idx:
-        return  # Sai da função se não houver linhas suficientes
-
-    dados = []
-    for coluna in config_colunas:
-        valor = coluna['prefixo']  # Inicializa com o prefixo, se houver
-        if coluna['codigo'] in referencias:
-            if coluna['posicao'] == 'antes':
-                valor = referencias[coluna['codigo']] + valor
-            else:
-                valor += referencias[coluna['codigo']]
-        dados.append(valor)
-
-    # Preenche a linha especificada com os dados configurados
-    for col_num, texto in enumerate(dados):
-        celula = tabela.cell(linha_idx, col_num)
-        paragrafo = celula.paragraphs[0]
-        paragrafo.text = texto
-        paragrafo.alignment = WD_PARAGRAPH_ALIGNMENT.JUSTIFY
-
-
-import os
-
+############################################# escolher_local_salvamento(): ###############################################
 def escolher_local_salvamento():
     # Obtém o caminho para a pasta de downloads do usuário atual
     downloads_path = os.path.join(os.path.expanduser('~'), 'Downloads')
@@ -132,14 +108,51 @@ def escolher_local_salvamento():
         return None
 
 
+######################################### formatar_nomes_modulos(referencias) ############################################
+def formatar_nomes_modulos(referencias):
+    # Lista para armazenar os nomes dos módulos
+    nomes_modulos = []
 
-def atualizar_tabela_com_campos_novos(tabela, referencias):
+    # Adiciona o nome do primeiro módulo
+    nomes_modulos.append(referencias["C001"])  # Assumindo que C001 é a chave para o nome do primeiro módulo
+
+    # Adiciona os nomes dos módulos dinâmicos
+    modulo_idx = 2
+    while f"C{modulo_idx:03}" in referencias:
+        nomes_modulos.append(referencias[f"C{modulo_idx:03}"])
+        modulo_idx += 1
+
+    # Formata a lista de nomes de módulos para a string final
+    if len(nomes_modulos) > 1:
+        # Junta todos os nomes com vírgula, exceto o último que é precedido por "e"
+        nomes_formatados = ", ".join(nomes_modulos[:-1]) + " e " + nomes_modulos[-1]
+    else:
+        # Apenas um módulo, então retorna ele
+        nomes_formatados = nomes_modulos[0]
+
+    return nomes_formatados
+
+################################# substituir_marcador_modulos(documento, referencias) ####################################
+def substituir_marcador_modulos(documento, referencias):
+    # Gera a string formatada dos nomes dos módulos
+    nomes_modulos_formatados = formatar_nomes_modulos(referencias)
+    print("Nomes dos módulos formatados:", nomes_modulos_formatados)
+
+    # Substitui o marcador no documento
+    for paragrafo in documento.paragraphs:
+        if "C001" in paragrafo.text:
+            paragrafo.text = paragrafo.text.replace("C001", nomes_modulos_formatados)
+
+    # Se precisar substituir em células de tabelas também, adicione um loop similar para as células
+
+############################### atualizar_tabela1_com_campos_novos(tabela, referencias) ##################################
+def atualizar_tabela1_com_campos_novos(tabela, referencias):
     # Definição dos códigos de campos esperados para cada módulo novo
     codigos_por_modulo = [
-        ['C002', 'H002', 'D004', 'V002'],
-        ['C003', 'H003', 'D005', 'V003'],
-        ['C004', 'H004', 'D006', 'V004'],
-        ['C005', 'H005', 'D007', 'V005'],
+        ['C002', 'H002', 'D004', 'V002', 'T002'],
+        ['C003', 'H003', 'D005', 'V003', 'T003'],
+        ['C004', 'H004', 'D006', 'V004', 'T004'],
+        ['C005', 'H005', 'D007', 'V005', 'T005'],
     ]
 
     # Inicializa o índice da linha a ser preenchida na tabela
@@ -149,8 +162,11 @@ def atualizar_tabela_com_campos_novos(tabela, referencias):
         config_colunas = []
         todos_codigos_presentes = all(codigo in referencias for codigo in codigos)
 
+        if not all(codigo in referencias for codigo in codigos):
+            logging.error("Nem todos os códigos de módulo estão presentes em 'referencias'.")
+            break  # Interrompe se algum código estiver faltando
         # Se todos os códigos deste módulo estão presentes em referencias, prepara para preenchimento
-        if todos_codigos_presentes:
+        else:
             for codigo in codigos:
                 if codigo.startswith('C'):  # Para 'Consultor'
                     config_colunas.append({'codigo': codigo, 'prefixo': 'Consultor ', 'posicao': 'depois'})
@@ -166,39 +182,104 @@ def atualizar_tabela_com_campos_novos(tabela, referencias):
 
             # Incrementa o índice da linha para a próxima iteração
             linha_idx += 1
-        else:
-            print(codigos)  # Para ver quais códigos estão sendo verificados
-            print(referencias.keys())  # Para ver quais chaves estão presentes em referencias
 
-            logging.error("Nem todos os códigos estão presentes.")
-            break  # Sai do loop se um conjunto de campos não estiver completo
+########################### preencher_linha_tabela(tabela, linha_idx, referencias, config_colunas) #######################
+def preencher_linha_tabela(tabela, linha_idx, referencias, config_colunas):
+    if len(tabela.rows) <= linha_idx:
+        return
+
+    for col_num, config in enumerate(config_colunas):
+        celula = tabela.cell(linha_idx, col_num)
+        paragrafo = celula.paragraphs[0]
+
+        if 'codigo' in config and config['codigo']:
+            valor = referencias.get(config['codigo'], "")
+            if config.get('posicao', '') == 'depois':
+                texto = f"{config['prefixo']}{valor}"
+            else:
+                texto = f"{valor}{config['prefixo']}"
+        else:
+            texto = config['prefixo']
+
+        # Especial para o caso de consultor + modo de trabalho
+        if config['codigo'].startswith('C'):
+            # Assume que o código do modo de trabalho tem o mesmo índice que o do consultor, mas com 'T' em vez de 'C'
+            codigo_modo = 'T' + config['codigo'][1:]
+            modo_trabalho = referencias.get(codigo_modo, "")
+            texto = f"{texto} - {modo_trabalho}"
+
+        paragrafo.text = texto
+        paragrafo.alignment = WD_PARAGRAPH_ALIGNMENT.JUSTIFY
+
+def atualizar_tabela2_com_campos_novos(tabela, referencias):
+    # Assumindo que 'codigos_por_modulo' inclui os códigos para consultar nomes e valores hora
+    codigos_por_modulo = [
+        ['C002', 'V002'],
+        ['C003', 'V003'],
+        ['C004', 'V004'],
+        ['C005', 'V005'],
+        # Adicione mais conforme necessário
+    ]
+
+    linha_idx = 2  # Comece a adicionar na primeira linha disponível
+
+    for codigos in codigos_por_modulo:
+        if all(codigo in referencias for codigo in codigos):
+            c_codigo, v_codigo = codigos
+            consultor = referencias[c_codigo]
+            valor_hora = referencias[v_codigo]
+
+            # Adiciona uma nova linha se necessário
+            if linha_idx >= len(tabela.rows):
+                tabela.add_row()
+
+            # Preenche a primeira coluna
+            tabela.cell(linha_idx, 0).text = f"Valor hora profissional Consultor {consultor}"
+
+            # Preenche a segunda coluna
+            tabela.cell(linha_idx, 1).text = f"R$ {valor_hora}"
+
+            linha_idx += 1
+        else:
+            logging.error("Nem todos os códigos de módulo estão presentes em 'referencias'.")
+            pass
+
+
 def add_dynamic_module():
     global dynamic_module_count
     if dynamic_module_count >= 4:
         messagebox.showwarning("Limite Atingido", "Número máximo de 5 módulos atingido.")
+        logging.info("def add_dynamic_module(): Número máximo de 5 módulos atingido.")
         return
 
-    row_base = 10 + dynamic_module_count * 4
+    row_base = 10 + (dynamic_module_count * 2)
     dynamic_module_count += 1
 
-    # Armazenar widgets temporariamente para poder removê-los mais tarde
     module_widgets = []
 
-    labels_texts = [f"Módulo {dynamic_module_count + 1}", f"Horas Módulo {dynamic_module_count + 1}", f"Data Início Módulo {dynamic_module_count + 1}", f"Valor Módulo {dynamic_module_count + 1}"]
+    labels_texts = ["Módulo SAP","Qtde de Horas", "Data Início", "Valor/Hora"]
+    coluna_label = 0
+    coluna_entry = 1
     for i, text in enumerate(labels_texts):
-        row_offset = row_base + i//2
-        column_offset = 0 if i % 2 == 0 else 2
-        label = create_label(main_frame, text, row_offset, column_offset)
-        entry = create_entry(main_frame, row_offset, column_offset + 1)
+        label = create_label(inner_frame, f"{text}:", row_base, column=coluna_label)
+        coluna_label += 2
+        entry = create_entry(inner_frame, row_base, column=coluna_entry)
+        coluna_entry += 2
         module_widgets.extend([label, entry])
+        logging.info(f"Widgets: {module_widgets}")
 
-    dynamic_modules_widgets.append(module_widgets)
+    # Adiciona o modo de trabalho como botões de rádio
+    modo_trabalho_var = tk.StringVar(value="Remoto")
+    for i, mode in enumerate(["Remoto", "Híbrido", "Presencial"]):
+        tk.Radiobutton(inner_frame, text=mode, variable=modo_trabalho_var, value=mode, bg=background_color).grid(row=row_base, column=8 + i)
 
+    # Armazena os widgets de entrada e a variável do modo de trabalho para este módulo
+    module_widgets.append(modo_trabalho_var)  # Isso armazena a variável, não o widget
 
-    add_module_button.grid(row=row_base + 1, column=4, pady=(15, 15))
-    upload_logo_button.grid(row=row_base + 5, column=1, pady=(15, 15))
-    save_button.grid(row=row_base + 5, column=2, pady=(10, 10))
-    return module_widgets
+    dynamic_modules_widgets.append(module_widgets)  # Adiciona os widgets deste módulo à lista global
+
+    # Atualiza a posição do botão '+' para abaixo do último módulo adicionado
+    add_module_button.grid(row=row_base, column=11, pady=(10, 10))
 
 ########################################################################################################################
 ####################################-----Salva o Documento-----#########################################################
@@ -212,7 +293,7 @@ def save_document():
 
     # Verifica se algum campo está vazio
     if not all([n001_entry.get().strip(), s001_entry.get().strip(),
-                s003_entry.get().strip(), s004_entry.get().strip(), s005_entry.get().strip()]):
+                s003_entry.get().strip(), s005_entry.get().strip()]):
         messagebox.showerror("Erro", "Todos os campos devem ser preenchidos.")
         return
 
@@ -255,7 +336,8 @@ def save_document():
         return
     try:
         referencias1 = novosmodulos()
-        print("Após novosmodulos:", referencias1)
+        print("Após novos modulos:", referencias1)
+        logging.info(f"Novos módulos dinâmicos adicionados: {referencias1}")
     except Exception as e:
         logging.error(f"Erro ao atribuir as referências dos novos módulos: {str(e)}")
         messagebox.showerror("Erro", f"Erro ao atribuir as referências dos novos módulos: {str(e)}")
@@ -265,10 +347,11 @@ def save_document():
         referencias2 = referenciascampos()
         if(referencias1 == 0):
             referencias = referencias2
-            logging.info(f"Referencias iniciais")
+            logging.info(f"Referencias iniciais: {referencias}")
         else:
             referencias = referencias1
-            logging.info(f"Referencias campos adicionais")
+            logging.info(f"Referencias campos adicionais: {referencias}")
+            substituir_marcador_modulos(documento, referencias)
     except Exception as e:
         logging.error(f"Problema na validação das referências")
         return
@@ -297,18 +380,21 @@ def save_document():
                         replace_text_in_runs(paragrafo.runs, codigo, valor)
 
     tabela1 = documento.tables[1]  # Acessa a segunda tabela do documento
+    tabela2 = documento.tables[2]  # Acessa a terceira tabela do documento
     try:
-        atualizar_tabela_com_campos_novos(tabela1, referencias)
+        atualizar_tabela1_com_campos_novos(tabela1, referencias)
+        atualizar_tabela2_com_campos_novos(tabela2, referencias)
         logging.info(f"Tabela atualizada com campos novos")
     except Exception as e:
-        logging.error(f"Erro ao atualizar tabela com os campos novos")
+        logging.error(f"Erro ao atualizar tabela com os campos novos: {e}")
     # Salva o documento editado na pasta que o usuario escolher
+
     try:
         documento.save(documento_final_path)
         messagebox.showinfo("Sucesso", f"Documento salvo com sucesso em: {documento_final_path}")
         logging.info(f"Documento salvo com sucesso em: {documento_final_path}")
     except Exception as e:
-        messagebox.showerror("Erro", f"Erro ao salvar o documento: {e}")
+        messagebox.showerror("Erro", f"Erro ao salvar o documento: {e}, Feche o documento Word gerado anteriormente.")
         logging.error(f"Erro ao salvar o documento")
         return
 
@@ -316,7 +402,7 @@ def save_document():
     if messagebox.askyesno("Encerrar", "Deseja encerrar o programa?"):
         app.destroy()  #Encerra o programa
 
-background_color = "#FFFFFF"
+background_color = "#F1F1F1"
 text_color = "#000000"
 button_color = "#FFA500"
 
@@ -367,50 +453,63 @@ app.iconbitmap((os.path.join(base_path,"GUI","icone.ico")))  # Certifique-se de 
 app.configure(bg=background_color)
 
 # Criação do main_frame
-main_frame = tk.Frame(app, bg="#FFFFFF")
-main_frame.pack(expand=True, fill='both')
+main_frame = tk.Frame(app, bg="#F1F1F1")
+
+inner_frame = tk.Frame(main_frame, bg=background_color)
+inner_frame.pack(pady=20)  # Isso adiciona um pouco de espaço vertical e centraliza horizontalmente
 
 # Carregando e exibindo o logotipo
 logo = tk.PhotoImage(file=(os.path.join(base_path,"GUI","logotipo fusion.png"))) # Assegure-se de que o arquivo esteja no diretório correto
 logo_label = tk.Label(app, image=logo, bg=background_color)
-logo_label.pack(pady=(2, 2))
+logo_label.pack(pady=(50, 20), anchor="n")
+main_frame.pack(expand=True, fill='both')
+
+# Crie um frame separado para os botões na parte inferior
+buttons_frame = tk.Frame(main_frame, bg=background_color)  # Use main_frame como parent para manter na parte inferior
+buttons_frame.pack(side='bottom', fill='x', pady=(0, 150))  # Isso posiciona o frame na parte inferior com padding de 150px no bottom
+
+upload_logo_button = tk.Button(buttons_frame, text="Upload Logo", command=upload_logo, bg=button_color, fg=text_color, cursor="hand2")
+upload_logo_button.pack(side='top', pady=5)  # Ajuste o lado conforme necessário
+
+save_button = tk.Button(buttons_frame, text="Salvar Documento", command=save_document, bg=button_color, fg=text_color, cursor="hand2")
+save_button.pack(side='top', pady=5)  # Ajuste o lado conforme necessário
 
 
 #screen.center_window(650, 800)
 
 main_frame = tk.Frame(app, bg=background_color)
-main_frame.pack(expand=True)
 
-create_label(main_frame, "Número da Proposta", 0, 0)
-create_label(main_frame, "Nome do Cliente", 1, 0)
-create_label(main_frame, "Gerente de Contas", 2, 0)
-create_label(main_frame, "Necessidade", 0, 2)
-create_label(main_frame, "Nome do Consultor", 1, 2)
-create_label(main_frame, "Nome do Executivo Comercial", 2, 0)
-create_label(main_frame, "Módulo 1", 6, 0)
-create_label(main_frame, "Horas Módulo 1", 6, 2)
-create_label(main_frame, "Data Início Módulo 1", 7, 0)
-create_label(main_frame, "Valor Módulo 1", 7, 2)
+create_label(inner_frame, "Número da Proposta:", 0, 0)
+create_label(inner_frame, "Nome do Cliente:", 0, 2)
+create_label(inner_frame, "Necessidade:", 0, 4)
+create_label(inner_frame, "Executivo Comercial:", 0, 6)
+create_label(inner_frame, "Módulo SAP:", 1, 0)
+create_label(inner_frame, "Qtde de Horas:", 1, 2)
+create_label(inner_frame, "Data Início:", 1, 4)
+create_label(inner_frame, "Valor/Hora:", 1, 6)
 
-n001_entry = create_entry(main_frame, 0, 1)
-s001_entry = create_entry(main_frame, 1, 1)
-s003_entry = create_entry(main_frame, 0, 3)
-s004_entry = create_entry(main_frame, 1, 3)
-s005_entry = create_entry(main_frame, 2, 1)
-c001_entry = create_entry(main_frame, 6, 1)
-h001_entry = create_entry(main_frame, 6, 3)
-d003_entry = create_entry(main_frame, 7, 1)
-v001_entry = create_entry(main_frame, 7, 3)
+n001_entry = create_entry(inner_frame, 0, 1)
+s001_entry = create_entry(inner_frame, 0, 3)
+s003_entry = create_entry(inner_frame, 0, 5)
+s005_entry = create_entry(inner_frame, 0, 7)
+c001_entry = create_entry(inner_frame, 1, 1)
+h001_entry = create_entry(inner_frame, 1, 3)
+d003_entry = create_entry(inner_frame, 1, 5)
+v001_entry = create_entry(inner_frame, 1, 7)
 
 # Adicione o botão para adicionar novos módulos na interface, ajustando sua posição inicial
-add_module_button = tk.Button(main_frame, text="+", command=add_dynamic_module, bg=button_color, fg=text_color)
-add_module_button.grid(row=7, column=4, pady=(15, 15))
+add_module_button = tk.Button(inner_frame, text="+", command=add_dynamic_module, bg=button_color, fg=text_color, cursor="hand2")
+add_module_button.grid(row=1, column=11, pady=(15, 15))
 
-upload_logo_button = tk.Button(main_frame, text="Upload Logo", command=upload_logo, bg=button_color, fg=text_color)
-upload_logo_button.grid(row=12, column=1, pady=(10, 10))
+# Valor que representa a escolha do usuário para o modo de trabalho do módulo 1
+modo_trabalho_modulo_1 = tk.StringVar(value="Remoto")
 
-save_button = tk.Button(main_frame, text="Salvar Documento", command=save_document, bg=button_color, fg=text_color)
-save_button.grid(row=12, column=2, pady=(10, 10))
+# Cria botões de rádio para o modo de trabalho do módulo 1
+tk.Radiobutton(inner_frame, text="Remoto", variable=modo_trabalho_modulo_1, value="Remoto", bg=background_color).grid(row=1, column=8)
+tk.Radiobutton(inner_frame, text="Híbrido", variable=modo_trabalho_modulo_1, value="Híbrido", bg=background_color).grid(row=1, column=9)
+tk.Radiobutton(inner_frame, text="Presencial", variable=modo_trabalho_modulo_1, value="Presencial", bg=background_color).grid(row=1, column=10)
+
+
 
 
 app.mainloop()
